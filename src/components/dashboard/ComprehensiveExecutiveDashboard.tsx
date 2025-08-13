@@ -19,10 +19,10 @@ import {
   Percent,
   Clock
 } from 'lucide-react';
-import { ExecutiveFilters } from './ExecutiveFilters';
+import { ExecutiveLocationSelector } from './ExecutiveLocationSelector';
 import { ExecutiveMetricCardsGrid } from './ExecutiveMetricCardsGrid';
 import { ExecutiveChartsGrid } from './ExecutiveChartsGrid';
-import { ExecutiveDataTablesGrid } from './ExecutiveDataTablesGrid';
+import { EnhancedExecutiveDataTables } from './EnhancedExecutiveDataTables';
 import { ExecutiveTopPerformersGrid } from './ExecutiveTopPerformersGrid';
 import { SourceDataModal } from '@/components/ui/SourceDataModal';
 import { useGlobalFilters } from '@/contexts/GlobalFiltersContext';
@@ -38,13 +38,36 @@ export const ComprehensiveExecutiveDashboard = () => {
   const { filters } = useGlobalFilters();
 
   // Load real data from hooks
-  const { data: salesData, isLoading: salesLoading } = useSalesData();
+  const { data: salesData, loading: salesLoading } = useSalesData();
   const { data: sessionsData, loading: sessionsLoading } = useSessionsData();
-  const { data: payrollData, isLoading: payrollLoading } = usePayrollData();
+  const { data: payrollData, loading: payrollLoading } = usePayrollData();
   const { data: newClientsData, loading: newClientsLoading } = useNewClientData();
   const { data: leadsData, loading: leadsLoading } = useLeadsData();
 
-  // Filter data to previous month
+  // Get unique locations for the selector
+  const availableLocations = useMemo(() => {
+    const locations = new Set<string>();
+    
+    salesData?.forEach(sale => {
+      if (sale.calculatedLocation) locations.add(sale.calculatedLocation);
+    });
+    
+    sessionsData?.forEach(session => {
+      if (session.location) locations.add(session.location);
+    });
+    
+    newClientsData?.forEach(client => {
+      if (client.homeLocation) locations.add(client.homeLocation);
+    });
+    
+    payrollData?.forEach(payroll => {
+      if (payroll.location) locations.add(payroll.location);
+    });
+
+    return Array.from(locations).sort();
+  }, [salesData, sessionsData, newClientsData, payrollData]);
+
+  // Filter data to previous month and by location
   const previousMonthData = useMemo(() => {
     const now = new Date();
     const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -55,18 +78,48 @@ export const ComprehensiveExecutiveDashboard = () => {
       return date >= previousMonth && date < currentMonth;
     };
 
-    return {
-      sales: salesData?.filter(item => filterByPreviousMonth(item.paymentDate)) || [],
-      sessions: sessionsData?.filter(item => filterByPreviousMonth(item.date)) || [],
-      payroll: payrollData?.filter(item => {
+    const filterByLocation = (items: any[], locationKey: string) => {
+      if (!filters.location) return items;
+      return items.filter(item => item[locationKey] === filters.location);
+    };
+
+    const filteredSales = filterByLocation(
+      salesData?.filter(item => filterByPreviousMonth(item.paymentDate)) || [],
+      'calculatedLocation'
+    );
+
+    const filteredSessions = filterByLocation(
+      sessionsData?.filter(item => filterByPreviousMonth(item.date)) || [],
+      'location'
+    );
+
+    const filteredPayroll = filterByLocation(
+      payrollData?.filter(item => {
         const monthYear = item.monthYear;
         const prevMonthStr = previousMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
         return monthYear === prevMonthStr;
       }) || [],
-      newClients: newClientsData?.filter(item => filterByPreviousMonth(item.firstVisitDate)) || [],
-      leads: leadsData?.filter(item => filterByPreviousMonth(item.createdAt || '')) || []
+      'location'
+    );
+
+    const filteredNewClients = filterByLocation(
+      newClientsData?.filter(item => filterByPreviousMonth(item.firstVisitDate)) || [],
+      'homeLocation'
+    );
+
+    const filteredLeads = filterByLocation(
+      leadsData?.filter(item => filterByPreviousMonth(item.createdAt || '')) || [],
+      'location'
+    );
+
+    return {
+      sales: filteredSales,
+      sessions: filteredSessions,
+      payroll: filteredPayroll,
+      newClients: filteredNewClients,
+      leads: filteredLeads
     };
-  }, [salesData, sessionsData, payrollData, newClientsData, leadsData]);
+  }, [salesData, sessionsData, payrollData, newClientsData, leadsData, filters.location]);
 
   const isLoading = salesLoading || sessionsLoading || payrollLoading || newClientsLoading || leadsLoading;
 
@@ -107,7 +160,8 @@ export const ComprehensiveExecutiveDashboard = () => {
               </h1>
               
               <p className="text-xl text-indigo-100 max-w-4xl mx-auto leading-relaxed animate-fade-in-up delay-300">
-                Comprehensive real-time insights across Sales, Leads, Sessions, Trainers, and Client Conversions - Previous Month Performance
+                Comprehensive real-time insights across Sales, Leads, Sessions, Trainers, and Client Conversions
+                {filters.location && ` - ${filters.location}`}
               </p>
               
               <div className="flex items-center justify-center gap-4 animate-fade-in-up delay-400">
@@ -128,8 +182,8 @@ export const ComprehensiveExecutiveDashboard = () => {
           </div>
         </div>
 
-        {/* Executive Filters */}
-        <ExecutiveFilters />
+        {/* Location Selector */}
+        <ExecutiveLocationSelector locations={availableLocations} />
 
         {/* Key Performance Metrics - 12 Cards with real data */}
         <ExecutiveMetricCardsGrid data={previousMonthData} />
@@ -146,7 +200,7 @@ export const ComprehensiveExecutiveDashboard = () => {
               </div>
               Comprehensive Performance Analytics
               <Badge className="bg-white/20 text-white backdrop-blur-sm px-3 py-1">
-                8+ Data Tables
+                15+ Data Tables
               </Badge>
             </CardTitle>
           </CardHeader>
@@ -186,7 +240,7 @@ export const ComprehensiveExecutiveDashboard = () => {
 
               <div className="space-y-6">
                 <TabsContent value="overview" className="space-y-6 mt-0">
-                  <ExecutiveDataTablesGrid data={previousMonthData} />
+                  <EnhancedExecutiveDataTables data={previousMonthData} selectedLocation={filters.location} />
                 </TabsContent>
 
                 <TabsContent value="performers" className="space-y-6 mt-0">
