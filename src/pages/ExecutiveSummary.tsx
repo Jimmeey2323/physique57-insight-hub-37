@@ -1,6 +1,6 @@
 
 import React from 'react';
-import ExecutiveSummarySection from '@/components/dashboard/ExecutiveSummarySection';
+import { ExecutiveSummarySection } from '@/components/dashboard/ExecutiveSummarySection';
 import { Footer } from '@/components/ui/footer';
 import { GlobalFiltersProvider } from '@/contexts/GlobalFiltersContext';
 

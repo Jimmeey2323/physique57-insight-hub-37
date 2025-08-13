@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, Filter, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { CalendarIcon, Filter, X, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
