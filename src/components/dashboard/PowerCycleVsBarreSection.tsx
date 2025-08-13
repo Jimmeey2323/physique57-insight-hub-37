@@ -13,6 +13,7 @@ import { EnhancedTrainerDrillDownModal } from './EnhancedTrainerDrillDownModal';
 import { useSessionsData, SessionData } from '@/hooks/useSessionsData';
 import { useFilteredSessionsData } from '@/hooks/useFilteredSessionsData';
 import { SessionsFiltersProvider } from '@/contexts/SessionsFiltersContext';
+import { SessionData as DashboardSessionData } from '@/types/dashboard';
 
 const PowerCycleVsBarreSection = () => {
   const [selectedTab, setSelectedTab] = useState('metrics');
@@ -21,6 +22,29 @@ const PowerCycleVsBarreSection = () => {
   
   const { data: sessionsData, loading, error } = useSessionsData();
   const filteredSessions = useFilteredSessionsData(sessionsData);
+
+  // Transform hook SessionData to dashboard SessionData format
+  const transformSessionData = (sessions: SessionData[]): DashboardSessionData[] => {
+    return sessions.map(session => ({
+      sessionId: session.sessionId,
+      date: session.date,
+      time: session.time,
+      classType: session.classType,
+      cleanedClass: session.cleanedClass,
+      instructor: session.trainerName, // Map trainerName to instructor
+      location: session.location,
+      capacity: session.capacity,
+      booked: session.bookedCount || 0, // Map bookedCount to booked
+      checkedIn: session.checkedInCount, // Map checkedInCount to checkedIn
+      checkedInCount: session.checkedInCount,
+      waitlisted: 0, // Default value
+      waitlist: 0, // Default value
+      noShows: Math.max(0, (session.bookedCount || 0) - session.checkedInCount),
+      fillPercentage: session.fillPercentage || 0,
+      sessionCount: 1,
+      totalAttendees: session.checkedInCount
+    }));
+  };
 
   // Separate PowerCycle and Barre data
   const { powerCycleData, barreData } = useMemo(() => {
@@ -38,7 +62,10 @@ const PowerCycleVsBarreSection = () => {
       return className.includes('barre');
     });
 
-    return { powerCycleData: powerCycle, barreData: barre };
+    return { 
+      powerCycleData: transformSessionData(powerCycle), 
+      barreData: transformSessionData(barre) 
+    };
   }, [filteredSessions]);
 
   // Calculate metrics for comparison component
@@ -58,11 +85,22 @@ const PowerCycleVsBarreSection = () => {
       noShows: data.reduce((sum, s) => sum + Math.max(0, (s.bookedCount || 0) - s.checkedInCount), 0)
     });
 
+    // Use original filtered sessions for metrics calculation
+    const powerCycleOriginal = filteredSessions.filter(session => {
+      const className = session.cleanedClass?.toLowerCase() || '';
+      return className.includes('cycle') || className.includes('power');
+    });
+
+    const barreOriginal = filteredSessions.filter(session => {
+      const className = session.cleanedClass?.toLowerCase() || '';
+      return className.includes('barre');
+    });
+
     return {
-      powerCycleMetrics: calculateMetrics(powerCycleData),
-      barreMetrics: calculateMetrics(barreData)
+      powerCycleMetrics: calculateMetrics(powerCycleOriginal),
+      barreMetrics: calculateMetrics(barreOriginal)
     };
-  }, [powerCycleData, barreData]);
+  }, [filteredSessions]);
 
   const handleItemClick = (item: any) => {
     setSelectedTrainer(item);
@@ -192,6 +230,8 @@ const PowerCycleVsBarreSection = () => {
                   <PowerCycleVsBarreTables 
                     powerCycleData={powerCycleData}
                     barreData={barreData}
+                    salesData={[]}
+                    payrollData={[]}
                     onItemClick={handleRowClick}
                   />
                 </TabsContent>
@@ -211,6 +251,7 @@ const PowerCycleVsBarreSection = () => {
         {selectedTrainer && (
           <EnhancedTrainerDrillDownModal
             trainerData={selectedTrainer}
+            trainerName={selectedTrainer.name || selectedTrainer.trainerName || 'Unknown Trainer'}
             isOpen={isDrillDownOpen}
             onClose={() => setIsDrillDownOpen(false)}
           />
