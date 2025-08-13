@@ -10,31 +10,16 @@ import { PowerCycleVsBarreComparison } from './PowerCycleVsBarreComparison';
 import { PowerCycleVsBarreTables } from './PowerCycleVsBarreTables';
 import { PowerCycleVsBarreTopBottomLists } from './PowerCycleVsBarreTopBottomLists';
 import { EnhancedTrainerDrillDownModal } from './EnhancedTrainerDrillDownModal';
-import { useSessionsData, SessionData } from '@/hooks/useSessionsData';
+import { useSessionsData } from '@/hooks/useSessionsData';
 import { useFilteredSessionsData } from '@/hooks/useFilteredSessionsData';
 import { SessionsFiltersProvider } from '@/contexts/SessionsFiltersContext';
-
-// Transform hook SessionData to component expected format
-const transformSessionData = (sessions: SessionData[]) => {
-  return sessions.map(session => ({
-    ...session,
-    instructor: session.trainerName,
-    booked: session.bookedCount,
-    checkedIn: session.checkedInCount,
-    waitlisted: 0, // Not available in hook data
-    waitlist: 0,
-    noShows: 0,
-    sessionCount: 1,
-    totalAttendees: session.checkedInCount
-  }));
-};
 
 const PowerCycleVsBarreSection = () => {
   const [selectedTab, setSelectedTab] = useState('metrics');
   const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
   const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
   
-  const { data: sessionsData, loading, error } = useSessionsData();
+  const { data: sessionsData, isLoading: loading, error } = useSessionsData();
   const filteredSessions = useFilteredSessionsData(sessionsData);
 
   // Separate PowerCycle and Barre data
@@ -55,6 +40,29 @@ const PowerCycleVsBarreSection = () => {
 
     return { powerCycleData: powerCycle, barreData: barre };
   }, [filteredSessions]);
+
+  // Calculate metrics for comparison component
+  const comparisonMetrics = useMemo(() => {
+    const calculateMetrics = (data: any[]) => ({
+      totalSessions: data.length,
+      totalAttendance: data.reduce((sum, s) => sum + s.checkedInCount, 0),
+      totalCapacity: data.reduce((sum, s) => sum + s.capacity, 0),
+      totalBookings: data.reduce((sum, s) => sum + s.bookedCount, 0),
+      emptySessions: data.filter(s => s.checkedInCount === 0).length,
+      avgFillRate: data.length > 0 ? (data.reduce((sum, s) => sum + s.fillPercentage, 0) / data.length) : 0,
+      avgSessionSize: data.length > 0 ? (data.reduce((sum, s) => sum + s.checkedInCount, 0) / data.length) : 0,
+      avgSessionSizeExclEmpty: (() => {
+        const nonEmpty = data.filter(s => s.checkedInCount > 0);
+        return nonEmpty.length > 0 ? (nonEmpty.reduce((sum, s) => sum + s.checkedInCount, 0) / nonEmpty.length) : 0;
+      })(),
+      noShows: data.reduce((sum, s) => sum + (s.bookedCount - s.checkedInCount), 0)
+    });
+
+    return {
+      powerCycleMetrics: calculateMetrics(powerCycleData),
+      barreMetrics: calculateMetrics(barreData)
+    };
+  }, [powerCycleData, barreData]);
 
   const handleItemClick = (item: any) => {
     setSelectedTrainer(item);
@@ -167,37 +175,31 @@ const PowerCycleVsBarreSection = () => {
               <div className="space-y-6">
                 <TabsContent value="metrics" className="space-y-6 mt-0">
                   <PowerCycleVsBarreMetricCards 
-                    data={{
-                      powerCycle: transformSessionData(powerCycleData),
-                      barre: transformSessionData(barreData)
-                    }}
+                    data={[...powerCycleData, ...barreData]}
+                    onCardClick={handleItemClick}
                   />
                 </TabsContent>
 
                 <TabsContent value="comparison" className="space-y-6 mt-0">
                   <PowerCycleVsBarreComparison 
-                    data={{
-                      powerCycle: transformSessionData(powerCycleData),
-                      barre: transformSessionData(barreData)
-                    }}
+                    powerCycleMetrics={comparisonMetrics.powerCycleMetrics}
+                    barreMetrics={comparisonMetrics.barreMetrics}
                     onItemClick={handleItemClick}
                   />
                 </TabsContent>
 
                 <TabsContent value="tables" className="space-y-6 mt-0">
                   <PowerCycleVsBarreTables 
-                    data={{
-                      powerCycle: transformSessionData(powerCycleData),
-                      barre: transformSessionData(barreData)
-                    }}
+                    powerCycleData={powerCycleData}
+                    barreData={barreData}
                     onItemClick={handleRowClick}
                   />
                 </TabsContent>
 
                 <TabsContent value="rankings" className="space-y-6 mt-0">
                   <PowerCycleVsBarreTopBottomLists 
-                    powerCycleData={transformSessionData(powerCycleData)}
-                    barreData={transformSessionData(barreData)}
+                    powerCycleData={powerCycleData}
+                    barreData={barreData}
                   />
                 </TabsContent>
               </div>
@@ -208,7 +210,7 @@ const PowerCycleVsBarreSection = () => {
         {/* Drill Down Modal */}
         {selectedTrainer && (
           <EnhancedTrainerDrillDownModal
-            trainer={selectedTrainer}
+            trainerData={selectedTrainer}
             open={isDrillDownOpen}
             onOpenChange={setIsDrillDownOpen}
           />
