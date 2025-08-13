@@ -29,7 +29,7 @@ import { useGlobalFilters } from '@/contexts/GlobalFiltersContext';
 import { useSalesData } from '@/hooks/useSalesData';
 import { useSessionsData } from '@/hooks/useSessionsData';
 import { usePayrollData } from '@/hooks/usePayrollData';
-import { useNewClientsData } from '@/hooks/useNewClientsData';
+import { useNewClientData } from '@/hooks/useNewClientData';
 import { useLeadsData } from '@/hooks/useLeadsData';
 
 export const ComprehensiveExecutiveDashboard = () => {
@@ -39,10 +39,10 @@ export const ComprehensiveExecutiveDashboard = () => {
 
   // Load real data from hooks
   const { data: salesData, isLoading: salesLoading } = useSalesData();
-  const { data: sessionsData, isLoading: sessionsLoading } = useSessionsData();
+  const { data: sessionsData, loading: sessionsLoading } = useSessionsData();
   const { data: payrollData, isLoading: payrollLoading } = usePayrollData();
-  const { data: newClientsData, isLoading: newClientsLoading } = useNewClientsData();
-  const { data: leadsData, isLoading: leadsLoading } = useLeadsData();
+  const { data: newClientsData, loading: newClientsLoading } = useNewClientData();
+  const { data: leadsData, loading: leadsLoading } = useLeadsData();
 
   // Filter data to previous month
   const previousMonthData = useMemo(() => {
@@ -64,7 +64,7 @@ export const ComprehensiveExecutiveDashboard = () => {
         return monthYear === prevMonthStr;
       }) || [],
       newClients: newClientsData?.filter(item => filterByPreviousMonth(item.firstVisitDate)) || [],
-      leads: leadsData?.filter(item => filterByPreviousMonth(item.createdDate || '')) || []
+      leads: leadsData?.filter(item => filterByPreviousMonth(item.createdAt || '')) || []
     };
   }, [salesData, sessionsData, payrollData, newClientsData, leadsData]);
 
