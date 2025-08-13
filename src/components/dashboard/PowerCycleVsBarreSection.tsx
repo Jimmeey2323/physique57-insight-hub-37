@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,15 +38,15 @@ const transformSessionData = (hookData: HookSessionData[]): DashboardSessionData
     instructor: session.trainerName || '', // Map trainerName to instructor
     location: session.location || '',
     capacity: session.capacity || 0,
-    booked: session.booked || 0, // Use booked if available, fallback to checkedInCount
+    booked: session.bookedCount || session.checkedInCount || 0, // Use bookedCount or fallback to checkedInCount
     checkedIn: session.checkedInCount || 0, // Map checkedInCount to checkedIn
     checkedInCount: session.checkedInCount || 0,
-    waitlisted: session.waitlist || 0, // Map waitlist to waitlisted
-    waitlist: session.waitlist || 0,
-    noShows: session.noShows || 0,
+    waitlisted: session.lateCancelledCount || 0, // Use lateCancelledCount as waitlisted fallback
+    waitlist: session.lateCancelledCount || 0, // Use lateCancelledCount as waitlist fallback
+    noShows: session.lateCancelledCount || 0, // Use lateCancelledCount as noShows fallback
     fillPercentage: session.fillPercentage || 0,
-    sessionCount: session.sessionCount || 0,
-    totalAttendees: session.totalAttendees || session.checkedInCount || 0
+    sessionCount: 1, // Each session counts as 1
+    totalAttendees: session.checkedInCount || 0 // Use checkedInCount as totalAttendees
   }));
 };
 
@@ -286,4 +287,5 @@ const PowerCycleVsBarreSectionWithProvider = () => {
   );
 };
 
+export { PowerCycleVsBarreSection };
 export default PowerCycleVsBarreSectionWithProvider;

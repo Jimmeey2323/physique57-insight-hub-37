@@ -12,6 +12,8 @@ interface ExecutiveLocationSelectorProps {
 export const ExecutiveLocationSelector: React.FC<ExecutiveLocationSelectorProps> = ({ locations }) => {
   const { filters, updateFilters } = useGlobalFilters();
 
+  const selectedLocation = Array.isArray(filters.location) ? filters.location[0] : filters.location;
+
   return (
     <Card className="bg-white/90 backdrop-blur-sm shadow-lg border-0">
       <CardContent className="p-4">
@@ -19,9 +21,9 @@ export const ExecutiveLocationSelector: React.FC<ExecutiveLocationSelectorProps>
           <MapPin className="w-5 h-5 text-blue-600" />
           <label className="text-sm font-medium text-gray-700">Filter by Location:</label>
           <Select
-            value={filters.location || 'all'}
+            value={selectedLocation || 'all'}
             onValueChange={(value) => 
-              updateFilters({ location: value === 'all' ? null : value })
+              updateFilters({ location: value === 'all' ? [] : [value] })
             }
           >
             <SelectTrigger className="w-48">

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSessionsData } from '@/hooks/useSessionsData';
 import { useGlobalLoading } from '@/hooks/useGlobalLoading';
 import { RefinedLoader } from '@/components/ui/RefinedLoader';
-import { PowerCycleVsBarreSection } from '@/components/dashboard/PowerCycleVsBarreSection';
+import PowerCycleVsBarreSection from '@/components/dashboard/PowerCycleVsBarreSection';
 import { SessionsFiltersProvider } from '@/contexts/SessionsFiltersContext';
 import { Button } from '@/components/ui/button';
 import { Home, BarChart3 } from 'lucide-react';
@@ -71,7 +71,7 @@ const PowerCycleVsBarre = () => {
       <div className="container mx-auto px-6 py-8">
         <main className="space-y-8">
           <SessionsFiltersProvider>
-            <PowerCycleVsBarreSection data={sessionData} />
+            <PowerCycleVsBarreSection />
           </SessionsFiltersProvider>
         </main>
       </div>

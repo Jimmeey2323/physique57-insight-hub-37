@@ -40,7 +40,7 @@ export const ComprehensiveExecutiveDashboard = () => {
   // Load real data from hooks
   const { data: salesData, loading: salesLoading } = useSalesData();
   const { data: sessionsData, loading: sessionsLoading } = useSessionsData();
-  const { data: payrollData, loading: payrollLoading } = usePayrollData();
+  const { data: payrollData, isLoading: payrollLoading } = usePayrollData();
   const { data: newClientsData, loading: newClientsLoading } = useNewClientData();
   const { data: leadsData, loading: leadsLoading } = useLeadsData();
 
@@ -79,8 +79,9 @@ export const ComprehensiveExecutiveDashboard = () => {
     };
 
     const filterByLocation = (items: any[], locationKey: string) => {
-      if (!filters.location) return items;
-      return items.filter(item => item[locationKey] === filters.location);
+      if (!filters.location || filters.location.length === 0) return items;
+      const locationFilter = Array.isArray(filters.location) ? filters.location[0] : filters.location;
+      return items.filter(item => item[locationKey] === locationFilter);
     };
 
     const filteredSales = filterByLocation(
@@ -134,6 +135,8 @@ export const ComprehensiveExecutiveDashboard = () => {
     );
   }
 
+  const selectedLocation = Array.isArray(filters.location) ? filters.location[0] : filters.location;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-pink-50/20 p-6">
       <div className="max-w-[1600px] mx-auto space-y-8">
@@ -161,7 +164,7 @@ export const ComprehensiveExecutiveDashboard = () => {
               
               <p className="text-xl text-indigo-100 max-w-4xl mx-auto leading-relaxed animate-fade-in-up delay-300">
                 Comprehensive real-time insights across Sales, Leads, Sessions, Trainers, and Client Conversions
-                {filters.location && ` - ${filters.location}`}
+                {selectedLocation && ` - ${selectedLocation}`}
               </p>
               
               <div className="flex items-center justify-center gap-4 animate-fade-in-up delay-400">
@@ -240,7 +243,7 @@ export const ComprehensiveExecutiveDashboard = () => {
 
               <div className="space-y-6">
                 <TabsContent value="overview" className="space-y-6 mt-0">
-                  <EnhancedExecutiveDataTables data={previousMonthData} selectedLocation={filters.location} />
+                  <EnhancedExecutiveDataTables data={previousMonthData} selectedLocation={selectedLocation} />
                 </TabsContent>
 
                 <TabsContent value="performers" className="space-y-6 mt-0">
