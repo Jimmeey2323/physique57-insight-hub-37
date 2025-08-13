@@ -2,7 +2,6 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ModernDataTable } from '@/components/ui/ModernDataTable';
 import { 
   DollarSign, 
   Users, 
@@ -12,8 +11,9 @@ import {
   TrendingDown,
   ShoppingCart,
   UserCheck,
-  Zap,
-  BarChart3
+  Calendar,
+  Star,
+  Zap
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 
@@ -25,490 +25,459 @@ interface EnhancedExecutiveDataTablesProps {
     newClients: any[];
     leads: any[];
   };
-  selectedLocation?: string | null;
+  selectedLocation?: string;
 }
 
 export const EnhancedExecutiveDataTables: React.FC<EnhancedExecutiveDataTablesProps> = ({ 
   data, 
   selectedLocation 
 }) => {
-  // Filter data by location if selected
-  const filteredData = useMemo(() => {
-    if (!selectedLocation) return data;
-    
-    return {
-      sales: data.sales.filter(s => !selectedLocation || s.calculatedLocation === selectedLocation),
-      sessions: data.sessions.filter(s => !selectedLocation || s.location === selectedLocation),
-      payroll: data.payroll.filter(p => !selectedLocation || p.location === selectedLocation),
-      newClients: data.newClients.filter(c => !selectedLocation || c.homeLocation === selectedLocation),
-      leads: data.leads.filter(l => !selectedLocation || l.location === selectedLocation)
-    };
-  }, [data, selectedLocation]);
-
-  // Sales by Product Analysis
+  // Process sales by product and category
   const salesByProduct = useMemo(() => {
-    const products = filteredData.sales.reduce((acc, sale) => {
-      const product = sale.paymentItem || 'Unknown';
+    const productGroups = data.sales.reduce((acc, sale) => {
+      const product = sale.cleanedProduct || 'Unknown Product';
+      const category = sale.cleanedCategory || 'Uncategorized';
+      
       if (!acc[product]) {
-        acc[product] = { 
-          product, 
-          revenue: 0, 
-          transactions: 0, 
-          customers: new Set(),
-          avgPrice: 0 
+        acc[product] = {
+          product,
+          category,
+          revenue: 0,
+          transactions: 0,
+          avgValue: 0
         };
       }
+      
       acc[product].revenue += sale.paymentValue || 0;
       acc[product].transactions += 1;
-      acc[product].customers.add(sale.memberId);
+      acc[product].avgValue = acc[product].revenue / acc[product].transactions;
+      
       return acc;
     }, {} as Record<string, any>);
-
-    return Object.values(products)
-      .map((p: any) => ({
-        ...p,
-        customers: p.customers.size,
-        avgPrice: p.transactions > 0 ? p.revenue / p.transactions : 0
-      }))
+    
+    return Object.values(productGroups)
       .sort((a: any, b: any) => b.revenue - a.revenue)
-      .slice(0, 15);
-  }, [filteredData.sales]);
+      .slice(0, 10);
+  }, [data.sales]);
 
-  // Sales by Category Analysis
-  const salesByCategory = useMemo(() => {
-    const categories = filteredData.sales.reduce((acc, sale) => {
-      const category = sale.cleanedCategory || 'Unknown';
-      if (!acc[category]) {
-        acc[category] = { 
-          category, 
-          revenue: 0, 
-          transactions: 0, 
-          products: new Set() 
-        };
-      }
-      acc[category].revenue += sale.paymentValue || 0;
-      acc[category].transactions += 1;
-      acc[category].products.add(sale.paymentItem);
-      return acc;
-    }, {} as Record<string, any>);
-
-    return Object.values(categories)
-      .map((c: any) => ({
-        ...c,
-        products: c.products.size,
-        avgTransaction: c.transactions > 0 ? c.revenue / c.transactions : 0
-      }))
-      .sort((a: any, b: any) => b.revenue - a.revenue);
-  }, [filteredData.sales]);
-
-  // Leads by Source and Conversion
+  // Process leads by source
   const leadsBySource = useMemo(() => {
-    const sources = filteredData.leads.reduce((acc, lead) => {
-      const source = lead.source || 'Unknown';
+    const sourceGroups = data.leads.reduce((acc, lead) => {
+      const source = lead.source || 'Unknown Source';
+      
       if (!acc[source]) {
-        acc[source] = { 
-          source, 
-          totalLeads: 0, 
-          conversions: 0, 
-          conversionRate: 0,
-          avgLTV: 0,
-          totalLTV: 0
+        acc[source] = {
+          source,
+          total: 0,
+          converted: 0,
+          conversionRate: 0
         };
       }
-      acc[source].totalLeads += 1;
+      
+      acc[source].total += 1;
       if (lead.conversionStatus === 'Converted') {
-        acc[source].conversions += 1;
-        acc[source].totalLTV += lead.ltv || 0;
+        acc[source].converted += 1;
       }
+      acc[source].conversionRate = acc[source].total > 0 ? (acc[source].converted / acc[source].total) * 100 : 0;
+      
       return acc;
     }, {} as Record<string, any>);
+    
+    return Object.values(sourceGroups)
+      .sort((a: any, b: any) => b.total - a.total)
+      .slice(0, 8);
+  }, [data.leads]);
 
-    return Object.values(sources)
-      .map((s: any) => ({
-        ...s,
-        conversionRate: s.totalLeads > 0 ? (s.conversions / s.totalLeads) * 100 : 0,
-        avgLTV: s.conversions > 0 ? s.totalLTV / s.conversions : 0
-      }))
-      .sort((a: any, b: any) => b.conversions - a.conversions);
-  }, [filteredData.leads]);
-
-  // New Clients by Class with Conversions
+  // Process new clients by class with conversions
   const newClientsByClass = useMemo(() => {
-    const classes = filteredData.newClients.reduce((acc, client) => {
-      const className = client.firstVisitType || 'Unknown';
+    const classGroups = data.newClients.reduce((acc, client) => {
+      const className = client.firstClassType || 'Unknown Class';
+      
       if (!acc[className]) {
-        acc[className] = { 
-          className, 
-          totalClients: 0, 
-          conversions: 0, 
+        acc[className] = {
+          className,
+          newClients: 0,
           retained: 0,
-          avgLTV: 0,
-          totalLTV: 0
+          retentionRate: 0
         };
       }
-      acc[className].totalClients += 1;
-      acc[className].totalLTV += client.ltv || 0;
-      if (client.conversionStatus === 'Converted') {
-        acc[className].conversions += 1;
-      }
+      
+      acc[className].newClients += 1;
       if (client.retentionStatus === 'Retained') {
         acc[className].retained += 1;
       }
+      acc[className].retentionRate = acc[className].newClients > 0 ? (acc[className].retained / acc[className].newClients) * 100 : 0;
+      
       return acc;
     }, {} as Record<string, any>);
+    
+    return Object.values(classGroups)
+      .sort((a: any, b: any) => b.newClients - a.newClients)
+      .slice(0, 8);
+  }, [data.newClients]);
 
-    return Object.values(classes)
-      .map((c: any) => ({
-        ...c,
-        conversionRate: c.totalClients > 0 ? (c.conversions / c.totalClients) * 100 : 0,
-        retentionRate: c.totalClients > 0 ? (c.retained / c.totalClients) * 100 : 0,
-        avgLTV: c.totalClients > 0 ? c.totalLTV / c.totalClients : 0
-      }))
-      .sort((a: any, b: any) => b.totalClients - a.totalClients)
-      .slice(0, 10);
-  }, [filteredData.newClients]);
-
-  // Class Performance Analysis
+  // Process top and bottom performing classes
   const classPerformance = useMemo(() => {
-    const classes = filteredData.sessions.reduce((acc, session) => {
-      const className = session.cleanedClass || 'Unknown';
+    const classGroups = data.sessions.reduce((acc, session) => {
+      const className = session.cleanedClass || 'Unknown Class';
+      
       if (!acc[className]) {
-        acc[className] = { 
-          className, 
-          totalSessions: 0, 
-          totalAttendance: 0, 
-          totalCapacity: 0, 
-          emptySessions: 0,
-          highPerformingSessions: 0
+        acc[className] = {
+          className,
+          sessions: 0,
+          totalAttendance: 0,
+          totalCapacity: 0,
+          fillRate: 0,
+          avgAttendance: 0
         };
       }
-      acc[className].totalSessions += 1;
+      
+      acc[className].sessions += 1;
       acc[className].totalAttendance += session.checkedInCount || 0;
       acc[className].totalCapacity += session.capacity || 0;
-      
-      if ((session.checkedInCount || 0) === 0) {
-        acc[className].emptySessions += 1;
-      }
-      
-      const fillRate = session.capacity > 0 ? (session.checkedInCount / session.capacity) * 100 : 0;
-      if (fillRate >= 80) {
-        acc[className].highPerformingSessions += 1;
-      }
+      acc[className].avgAttendance = acc[className].totalAttendance / acc[className].sessions;
+      acc[className].fillRate = acc[className].totalCapacity > 0 ? (acc[className].totalAttendance / acc[className].totalCapacity) * 100 : 0;
       
       return acc;
     }, {} as Record<string, any>);
+    
+    const sortedClasses = Object.values(classGroups).sort((a: any, b: any) => b.fillRate - a.fillRate);
+    
+    return {
+      top: sortedClasses.slice(0, 5),
+      bottom: sortedClasses.slice(-5).reverse()
+    };
+  }, [data.sessions]);
 
-    return Object.values(classes)
-      .map((c: any) => ({
-        ...c,
-        avgFillRate: c.totalCapacity > 0 ? ((c.totalAttendance / c.totalCapacity) * 100) : 0,
-        avgSessionSize: c.totalSessions > 0 ? (c.totalAttendance / c.totalSessions) : 0,
-        emptySessionRate: c.totalSessions > 0 ? (c.emptySessions / c.totalSessions) * 100 : 0,
-        highPerformanceRate: c.totalSessions > 0 ? (c.highPerformingSessions / c.totalSessions) * 100 : 0
-      }))
-      .sort((a: any, b: any) => b.avgFillRate - a.avgFillRate);
-  }, [filteredData.sessions]);
-
-  // Top and Bottom Products
-  const topProducts = salesByProduct.slice(0, 5);
-  const bottomProducts = salesByProduct.slice(-5).reverse();
-
-  // Top and Bottom Trainers
+  // Process trainer performance
   const trainerPerformance = useMemo(() => {
-    return filteredData.payroll
-      .map(trainer => ({
-        ...trainer,
-        fillRate: trainer.totalSessions > 0 ? ((trainer.totalCustomers / (trainer.totalSessions * 20)) * 100) : 0 // Assuming avg capacity of 20
-      }))
-      .sort((a, b) => (b.totalPaid || 0) - (a.totalPaid || 0));
-  }, [filteredData.payroll]);
+    const trainerGroups = data.sessions.reduce((acc, session) => {
+      const trainer = session.trainerName || 'Unknown Trainer';
+      
+      if (!acc[trainer]) {
+        acc[trainer] = {
+          trainer,
+          sessions: 0,
+          totalAttendance: 0,
+          avgAttendance: 0,
+          fillRate: 0
+        };
+      }
+      
+      acc[trainer].sessions += 1;
+      acc[trainer].totalAttendance += session.checkedInCount || 0;
+      acc[trainer].avgAttendance = acc[trainer].totalAttendance / acc[trainer].sessions;
+      
+      return acc;
+    }, {} as Record<string, any>);
+    
+    const sortedTrainers = Object.values(trainerGroups).sort((a: any, b: any) => b.avgAttendance - a.avgAttendance);
+    
+    return {
+      top: sortedTrainers.slice(0, 5),
+      bottom: sortedTrainers.slice(-5).reverse()
+    };
+  }, [data.sessions]);
 
-  const topTrainers = trainerPerformance.slice(0, 5);
-  const bottomTrainers = trainerPerformance.slice(-5).reverse();
-
-  // PowerCycle vs Barre Analysis
-  const powerCycleVsBarre = useMemo(() => {
-    const powerCycle = filteredData.sessions.filter(s => 
+  // PowerCycle vs Barre comparison
+  const formatComparison = useMemo(() => {
+    const powerCycleSessions = data.sessions.filter(s => 
       s.cleanedClass?.toLowerCase().includes('cycle') || 
-      s.cleanedClass?.toLowerCase().includes('power')
+      s.classType?.toLowerCase().includes('cycle')
     );
-    const barre = filteredData.sessions.filter(s => 
+    
+    const barreSessions = data.sessions.filter(s => 
       s.cleanedClass?.toLowerCase().includes('barre')
     );
 
-    const powerCycleMetrics = {
-      type: 'PowerCycle',
-      sessions: powerCycle.length,
-      attendance: powerCycle.reduce((sum, s) => sum + (s.checkedInCount || 0), 0),
-      capacity: powerCycle.reduce((sum, s) => sum + (s.capacity || 0), 0),
-      avgFillRate: 0
+    const powerCycleStats = {
+      sessions: powerCycleSessions.length,
+      attendance: powerCycleSessions.reduce((sum, s) => sum + (s.checkedInCount || 0), 0),
+      avgAttendance: powerCycleSessions.length > 0 ? powerCycleSessions.reduce((sum, s) => sum + (s.checkedInCount || 0), 0) / powerCycleSessions.length : 0
     };
 
-    const barreMetrics = {
-      type: 'Barre',
-      sessions: barre.length,
-      attendance: barre.reduce((sum, s) => sum + (s.checkedInCount || 0), 0),
-      capacity: barre.reduce((sum, s) => sum + (s.capacity || 0), 0),
-      avgFillRate: 0
+    const barreStats = {
+      sessions: barreSessions.length,
+      attendance: barreSessions.reduce((sum, s) => sum + (s.checkedInCount || 0), 0),
+      avgAttendance: barreSessions.length > 0 ? barreSessions.reduce((sum, s) => sum + (s.checkedInCount || 0), 0) / barreSessions.length : 0
     };
 
-    powerCycleMetrics.avgFillRate = powerCycleMetrics.capacity > 0 ? 
-      (powerCycleMetrics.attendance / powerCycleMetrics.capacity) * 100 : 0;
-    
-    barreMetrics.avgFillRate = barreMetrics.capacity > 0 ? 
-      (barreMetrics.attendance / barreMetrics.capacity) * 100 : 0;
+    return { powerCycle: powerCycleStats, barre: barreStats };
+  }, [data.sessions]);
 
-    return [powerCycleMetrics, barreMetrics];
-  }, [filteredData.sessions]);
-
-  // Column definitions
-  const productColumns = [
-    { key: 'product', header: 'Product', align: 'left' as const },
-    { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (value: number) => formatCurrency(value) },
-    { key: 'transactions', header: 'Sales', align: 'center' as const },
-    { key: 'customers', header: 'Customers', align: 'center' as const },
-    { key: 'avgPrice', header: 'Avg Price', align: 'right' as const, render: (value: number) => formatCurrency(value) }
-  ];
-
-  const categoryColumns = [
-    { key: 'category', header: 'Category', align: 'left' as const },
-    { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (value: number) => formatCurrency(value) },
-    { key: 'transactions', header: 'Transactions', align: 'center' as const },
-    { key: 'products', header: 'Products', align: 'center' as const },
-    { key: 'avgTransaction', header: 'Avg Sale', align: 'right' as const, render: (value: number) => formatCurrency(value) }
-  ];
-
-  const leadsColumns = [
-    { key: 'source', header: 'Source', align: 'left' as const },
-    { key: 'totalLeads', header: 'Total Leads', align: 'center' as const },
-    { key: 'conversions', header: 'Conversions', align: 'center' as const },
-    { key: 'conversionRate', header: 'Rate %', align: 'center' as const, render: (value: number) => `${value.toFixed(1)}%` },
-    { key: 'avgLTV', header: 'Avg LTV', align: 'right' as const, render: (value: number) => formatCurrency(value) }
-  ];
-
-  const clientClassColumns = [
-    { key: 'className', header: 'Class Type', align: 'left' as const },
-    { key: 'totalClients', header: 'New Clients', align: 'center' as const },
-    { key: 'conversions', header: 'Conversions', align: 'center' as const },
-    { key: 'conversionRate', header: 'Conv %', align: 'center' as const, render: (value: number) => `${value.toFixed(1)}%` },
-    { key: 'retentionRate', header: 'Retention %', align: 'center' as const, render: (value: number) => `${value.toFixed(1)}%` },
-    { key: 'avgLTV', header: 'Avg LTV', align: 'right' as const, render: (value: number) => formatCurrency(value) }
-  ];
-
-  const classPerformanceColumns = [
-    { key: 'className', header: 'Class Type', align: 'left' as const },
-    { key: 'totalSessions', header: 'Sessions', align: 'center' as const },
-    { key: 'totalAttendance', header: 'Attendance', align: 'center' as const },
-    { key: 'avgFillRate', header: 'Fill Rate %', align: 'center' as const, render: (value: number) => `${Math.round(value)}%` },
-    { key: 'avgSessionSize', header: 'Avg Size', align: 'center' as const, render: (value: number) => value.toFixed(1) },
-    { key: 'emptySessionRate', header: 'Empty %', align: 'center' as const, render: (value: number) => `${value.toFixed(1)}%` }
-  ];
-
-  const trainerColumns = [
-    { key: 'teacherName', header: 'Trainer', align: 'left' as const },
-    { key: 'totalSessions', header: 'Sessions', align: 'center' as const },
-    { key: 'totalCustomers', header: 'Customers', align: 'center' as const },
-    { key: 'totalPaid', header: 'Revenue', align: 'right' as const, render: (value: number) => formatCurrency(value) },
-    { key: 'classAverageExclEmpty', header: 'Avg Class', align: 'center' as const, render: (value: number) => value?.toFixed(1) }
-  ];
-
-  const formatComparisonColumns = [
-    { key: 'type', header: 'Format', align: 'left' as const },
-    { key: 'sessions', header: 'Sessions', align: 'center' as const },
-    { key: 'attendance', header: 'Attendance', align: 'center' as const },
-    { key: 'capacity', header: 'Capacity', align: 'center' as const },
-    { key: 'avgFillRate', header: 'Fill Rate %', align: 'center' as const, render: (value: number) => `${Math.round(value)}%` }
-  ];
+  if (!data || Object.values(data).every(arr => arr.length === 0)) {
+    return (
+      <div className="text-center text-gray-600 p-8">
+        <Activity className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+        <p>No data available for the selected location and time period.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Sales by Product */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
-            Sales by Product
-            <Badge className="bg-white/20 text-white">{salesByProduct.length} products</Badge>
+      <Card className="bg-gradient-to-br from-white via-blue-50/30 to-white border-0 shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-blue-600" />
+            Top Products by Revenue
+            <Badge variant="secondary">{salesByProduct.length} items</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={salesByProduct}
-            columns={productColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Sales by Category */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5" />
-            Sales by Category
-            <Badge className="bg-white/20 text-white">{salesByCategory.length} categories</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={salesByCategory}
-            columns={categoryColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Top Products */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-emerald-600 to-green-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Top Performing Products
-            <Badge className="bg-white/20 text-white">Top 5</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={topProducts}
-            columns={productColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Bottom Products */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-red-600 to-pink-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <TrendingDown className="w-5 h-5" />
-            Low Performing Products
-            <Badge className="bg-white/20 text-white">Bottom 5</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={bottomProducts}
-            columns={productColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
+        <CardContent>
+          <div className="space-y-3">
+            {salesByProduct.map((product: any, index) => (
+              <div key={product.product} className="flex items-center justify-between p-3 bg-white/80 rounded-lg shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-bold text-blue-600">#{index + 1}</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800 text-sm">{product.product}</p>
+                    <p className="text-xs text-slate-500">{product.category}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-slate-900">{formatCurrency(product.revenue)}</p>
+                  <p className="text-xs text-slate-500">{product.transactions} sales</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
       {/* Leads by Source */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-purple-600 to-violet-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5" />
-            Leads by Source & Conversion
-            <Badge className="bg-white/20 text-white">{leadsBySource.length} sources</Badge>
+      <Card className="bg-gradient-to-br from-white via-green-50/30 to-white border-0 shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Target className="w-5 h-5 text-green-600" />
+            Lead Sources & Conversion
+            <Badge variant="secondary">{leadsBySource.length} sources</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={leadsBySource}
-            columns={leadsColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
+        <CardContent>
+          <div className="space-y-3">
+            {leadsBySource.map((source: any, index) => (
+              <div key={source.source} className="flex items-center justify-between p-3 bg-white/80 rounded-lg shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-bold text-green-600">#{index + 1}</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800 text-sm">{source.source}</p>
+                    <p className="text-xs text-slate-500">{source.total} leads</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-slate-900">{source.conversionRate.toFixed(1)}%</p>
+                  <p className="text-xs text-slate-500">{source.converted} converted</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
       {/* New Clients by Class */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <UserCheck className="w-5 h-5" />
-            New Clients by Class
-            <Badge className="bg-white/20 text-white">{newClientsByClass.length} classes</Badge>
+      <Card className="bg-gradient-to-br from-white via-purple-50/30 to-white border-0 shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-purple-600" />
+            New Clients by Class Type
+            <Badge variant="secondary">{newClientsByClass.length} classes</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={newClientsByClass}
-            columns={clientClassColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
+        <CardContent>
+          <div className="space-y-3">
+            {newClientsByClass.map((classData: any, index) => (
+              <div key={classData.className} className="flex items-center justify-between p-3 bg-white/80 rounded-lg shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-bold text-purple-600">#{index + 1}</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800 text-sm">{classData.className}</p>
+                    <p className="text-xs text-slate-500">{classData.newClients} new clients</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-slate-900">{classData.retentionRate.toFixed(1)}%</p>
+                  <p className="text-xs text-slate-500">retention</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Class Performance */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-orange-600 to-red-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5" />
-            Class Performance Analysis
-            <Badge className="bg-white/20 text-white">{classPerformance.length} classes</Badge>
+      {/* Top & Bottom Performing Classes */}
+      <Card className="bg-gradient-to-br from-white via-orange-50/30 to-white border-0 shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-orange-600" />
+            Class Performance Rankings
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={classPerformance}
-            columns={classPerformanceColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Top Trainers */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Top Performing Trainers
-            <Badge className="bg-white/20 text-white">Top 5</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={topTrainers}
-            columns={trainerColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Bottom Trainers */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-slate-600 to-gray-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <TrendingDown className="w-5 h-5" />
-            Low Performing Trainers
-            <Badge className="bg-white/20 text-white">Bottom 5</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={bottomTrainers}
-            columns={trainerColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-semibold text-green-700 mb-2 flex items-center gap-1">
+                <TrendingUp className="w-4 h-4" />
+                Top Performing
+              </h4>
+              <div className="space-y-2">
+                {classPerformance.top.map((classData: any, index) => (
+                  <div key={classData.className} className="flex items-center justify-between p-2 bg-green-50/50 rounded">
+                    <div className="flex items-center gap-2">
+                      <Star className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium">{classData.className}</span>
+                    </div>
+                    <span className="text-sm font-bold text-green-700">{classData.fillRate.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-red-700 mb-2 flex items-center gap-1">
+                <TrendingDown className="w-4 h-4" />
+                Needs Improvement
+              </h4>
+              <div className="space-y-2">
+                {classPerformance.bottom.map((classData: any, index) => (
+                  <div key={classData.className} className="flex items-center justify-between p-2 bg-red-50/50 rounded">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="w-4 h-4 text-red-600" />
+                      <span className="text-sm font-medium">{classData.className}</span>
+                    </div>
+                    <span className="text-sm font-bold text-red-700">{classData.fillRate.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       {/* PowerCycle vs Barre */}
-      <Card className="shadow-xl border-0">
-        <CardHeader className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5" />
-            PowerCycle vs Barre Comparison
-            <Badge className="bg-white/20 text-white">Format Analysis</Badge>
+      <Card className="bg-gradient-to-br from-white via-indigo-50/30 to-white border-0 shadow-lg lg:col-span-2">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-indigo-600" />
+            PowerCycle vs Barre Performance
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <ModernDataTable
-            data={powerCycleVsBarre}
-            columns={formatComparisonColumns}
-            maxHeight="400px"
-            stickyHeader={true}
-          />
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-5 h-5 text-blue-600" />
+                <h4 className="font-semibold text-blue-800">PowerCycle</h4>
+              </div>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-blue-900">{formatComparison.powerCycle.sessions}</p>
+                  <p className="text-xs text-blue-600">Sessions</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-900">{formatComparison.powerCycle.attendance}</p>
+                  <p className="text-xs text-blue-600">Total Attendance</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-900">{formatComparison.powerCycle.avgAttendance.toFixed(1)}</p>
+                  <p className="text-xs text-blue-600">Avg per Session</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-r from-pink-50 to-rose-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-5 h-5 text-pink-600" />
+                <h4 className="font-semibold text-pink-800">Barre</h4>
+              </div>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-pink-900">{formatComparison.barre.sessions}</p>
+                  <p className="text-xs text-pink-600">Sessions</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-pink-900">{formatComparison.barre.attendance}</p>
+                  <p className="text-xs text-pink-600">Total Attendance</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-pink-900">{formatComparison.barre.avgAttendance.toFixed(1)}</p>
+                  <p className="text-xs text-pink-600">Avg per Session</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Top Trainers */}
+      <Card className="bg-gradient-to-br from-white via-teal-50/30 to-white border-0 shadow-lg lg:col-span-2">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Users className="w-5 h-5 text-teal-600" />
+            Trainer Performance Rankings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold text-green-700 mb-3 flex items-center gap-1">
+                <TrendingUp className="w-4 h-4" />
+                Top Performers
+              </h4>
+              <div className="space-y-3">
+                {trainerPerformance.top.map((trainer: any, index) => (
+                  <div key={trainer.trainer} className="flex items-center justify-between p-3 bg-green-50/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-green-600">#{index + 1}</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-800 text-sm">{trainer.trainer}</p>
+                        <p className="text-xs text-slate-500">{trainer.sessions} sessions</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-green-700">{trainer.avgAttendance.toFixed(1)}</p>
+                      <p className="text-xs text-slate-500">avg attendance</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-orange-700 mb-3 flex items-center gap-1">
+                <TrendingDown className="w-4 h-4" />
+                Needs Support
+              </h4>
+              <div className="space-y-3">
+                {trainerPerformance.bottom.map((trainer: any, index) => (
+                  <div key={trainer.trainer} className="flex items-center justify-between p-3 bg-orange-50/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-orange-600">#{index + 1}</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-800 text-sm">{trainer.trainer}</p>
+                        <p className="text-xs text-slate-500">{trainer.sessions} sessions</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-orange-700">{trainer.avgAttendance.toFixed(1)}</p>
+                      <p className="text-xs text-slate-500">avg attendance</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

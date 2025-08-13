@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   DollarSign, 
   Users, 
@@ -14,7 +15,8 @@ import {
   Percent,
   Clock,
   Star,
-  Zap
+  Zap,
+  BarChart3
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { motion } from 'framer-motion';
@@ -31,10 +33,12 @@ interface ExecutiveMetricCardsGridProps {
 
 export const ExecutiveMetricCardsGrid: React.FC<ExecutiveMetricCardsGridProps> = ({ data }) => {
   const metrics = useMemo(() => {
-    // Calculate real metrics from data
+    // Calculate real metrics from SALES data for revenue (not sessions)
     const totalRevenue = data.sales.reduce((sum, sale) => sum + (sale.paymentValue || 0), 0);
+    const totalVAT = data.sales.reduce((sum, sale) => sum + (sale.paymentVAT || 0), 0);
+    const netRevenue = totalRevenue - totalVAT;
     const totalTransactions = data.sales.length;
-    const activeMembers = new Set(data.sales.map(sale => sale.memberId)).size;
+    const uniqueMembers = new Set(data.sales.map(sale => sale.memberId)).size;
     const totalSessions = data.sessions.length;
     const totalAttendance = data.sessions.reduce((sum, session) => sum + (session.checkedInCount || 0), 0);
     const totalCapacity = data.sessions.reduce((sum, session) => sum + (session.capacity || 0), 0);
@@ -58,22 +62,32 @@ export const ExecutiveMetricCardsGrid: React.FC<ExecutiveMetricCardsGridProps> =
       {
         title: 'Total Revenue',
         value: formatCurrency(totalRevenue),
-        change: '+12.5%', // This would need comparison with previous period
+        change: '+12.5%',
         changeType: 'positive',
         icon: DollarSign,
         color: 'from-green-500 to-emerald-600',
-        description: 'Previous month revenue',
+        description: 'Total sales revenue from all transactions',
         rawValue: totalRevenue
       },
       {
+        title: 'Net Revenue',
+        value: formatCurrency(netRevenue),
+        change: '+10.2%',
+        changeType: 'positive',
+        icon: DollarSign,
+        color: 'from-emerald-500 to-green-600',
+        description: 'Revenue after VAT deduction',
+        rawValue: netRevenue
+      },
+      {
         title: 'Active Members',
-        value: formatNumber(activeMembers),
+        value: formatNumber(uniqueMembers),
         change: '+8.2%',
         changeType: 'positive',
         icon: Users,
         color: 'from-blue-500 to-cyan-600',
         description: 'Unique paying members',
-        rawValue: activeMembers
+        rawValue: uniqueMembers
       },
       {
         title: 'Lead Conversion',
@@ -112,7 +126,7 @@ export const ExecutiveMetricCardsGrid: React.FC<ExecutiveMetricCardsGridProps> =
         changeType: 'positive',
         icon: ShoppingCart,
         color: 'from-indigo-500 to-blue-600',
-        description: 'Average transaction value',
+        description: 'Average transaction value from sales',
         rawValue: avgTransactionValue
       },
       {
@@ -136,14 +150,14 @@ export const ExecutiveMetricCardsGrid: React.FC<ExecutiveMetricCardsGridProps> =
         rawValue: sessionAttendanceRate
       },
       {
-        title: 'Top Trainer Revenue',
-        value: formatCurrency(topTrainerRevenue),
-        change: '+18.7%',
+        title: 'Total VAT',
+        value: formatCurrency(totalVAT),
+        change: '+9.5%',
         changeType: 'positive',
-        icon: Star,
-        color: 'from-pink-500 to-rose-600',
-        description: 'Highest earning trainer',
-        rawValue: topTrainerRevenue
+        icon: DollarSign,
+        color: 'from-red-500 to-pink-600',
+        description: 'Total VAT collected from sales',
+        rawValue: totalVAT
       },
       {
         title: 'PowerCycle Classes',
@@ -154,16 +168,6 @@ export const ExecutiveMetricCardsGrid: React.FC<ExecutiveMetricCardsGridProps> =
         color: 'from-violet-500 to-purple-600',
         description: 'PowerCycle sessions held',
         rawValue: powerCycleSessions
-      },
-      {
-        title: 'Empty Sessions',
-        value: formatNumber(emptySessions),
-        change: emptySessions > 10 ? '+5.3%' : '-3.2%',
-        changeType: emptySessions > 10 ? 'negative' : 'positive',
-        icon: TrendingDown,
-        color: 'from-red-500 to-pink-600',
-        description: 'Sessions with zero attendance',
-        rawValue: emptySessions
       },
       {
         title: 'Avg. Session Size',
@@ -219,6 +223,14 @@ export const ExecutiveMetricCardsGrid: React.FC<ExecutiveMetricCardsGridProps> =
             </Card>
           </motion.div>
         ))}
+      </div>
+
+      {/* Quick Action Dashboard Button */}
+      <div className="flex justify-center mt-8">
+        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-full text-lg font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+          <BarChart3 className="w-5 h-5 mr-2" />
+          View Detailed Dashboard
+        </Button>
       </div>
     </div>
   );

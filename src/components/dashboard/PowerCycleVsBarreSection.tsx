@@ -1,115 +1,92 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Zap, 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  Target,
-  Activity,
-  Calendar,
-  Filter
-} from 'lucide-react';
-import { PowerCycleVsBarreEnhancedFilterSection } from './PowerCycleVsBarreEnhancedFilterSection';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Zap, BarChart3, Calendar, TrendingUp, Users, Target, Clock, Activity } from 'lucide-react';
 import { PowerCycleVsBarreMetricCards } from './PowerCycleVsBarreMetricCards';
-import { PowerCycleVsBarreCharts } from './PowerCycleVsBarreCharts';
+import { PowerCycleVsBarreComparison } from './PowerCycleVsBarreComparison';
 import { PowerCycleVsBarreTables } from './PowerCycleVsBarreTables';
 import { PowerCycleVsBarreTopBottomLists } from './PowerCycleVsBarreTopBottomLists';
-import { PowerCycleVsBarreAdvancedMetrics } from './PowerCycleVsBarreAdvancedMetrics';
-import { PowerCycleVsBarreComparison } from './PowerCycleVsBarreComparison';
-import { SourceDataModal } from '@/components/ui/SourceDataModal';
-import { useSessionsData } from '@/hooks/useSessionsData';
+import { EnhancedTrainerDrillDownModal } from './EnhancedTrainerDrillDownModal';
+import { useSessionsData, SessionData } from '@/hooks/useSessionsData';
 import { useFilteredSessionsData } from '@/hooks/useFilteredSessionsData';
 import { SessionsFiltersProvider } from '@/contexts/SessionsFiltersContext';
-import { SessionData as HookSessionData } from '@/hooks/useSessionsData';
-import { SessionData as DashboardSessionData } from '@/types/dashboard';
 
-// Transform function to convert hook SessionData to dashboard SessionData
-const transformSessionData = (hookData: HookSessionData[]): DashboardSessionData[] => {
-  return hookData.map(session => ({
-    sessionId: session.sessionId || '',
-    date: session.date || '',
-    time: session.time || '',
-    classType: session.classType || '',
-    cleanedClass: session.cleanedClass || '',
-    instructor: session.trainerName || '', // Map trainerName to instructor
-    location: session.location || '',
-    capacity: session.capacity || 0,
-    booked: session.bookedCount || session.checkedInCount || 0, // Use bookedCount or fallback to checkedInCount
-    checkedIn: session.checkedInCount || 0, // Map checkedInCount to checkedIn
-    checkedInCount: session.checkedInCount || 0,
-    waitlisted: session.lateCancelledCount || 0, // Use lateCancelledCount as waitlisted fallback
-    waitlist: session.lateCancelledCount || 0, // Use lateCancelledCount as waitlist fallback
-    noShows: session.lateCancelledCount || 0, // Use lateCancelledCount as noShows fallback
-    fillPercentage: session.fillPercentage || 0,
-    sessionCount: 1, // Each session counts as 1
-    totalAttendees: session.checkedInCount || 0 // Use checkedInCount as totalAttendees
+// Transform hook SessionData to component expected format
+const transformSessionData = (sessions: SessionData[]) => {
+  return sessions.map(session => ({
+    ...session,
+    instructor: session.trainerName,
+    booked: session.bookedCount,
+    checkedIn: session.checkedInCount,
+    waitlisted: 0, // Not available in hook data
+    waitlist: 0,
+    noShows: 0,
+    sessionCount: 1,
+    totalAttendees: session.checkedInCount
   }));
 };
 
 const PowerCycleVsBarreSection = () => {
-  const [activeTab, setActiveTab] = useState('metrics');
-  const [showSourceData, setShowSourceData] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('metrics');
+  const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
+  const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
+  
   const { data: sessionsData, loading, error } = useSessionsData();
-  
-  // Use filtered data
-  const filteredData = useFilteredSessionsData(sessionsData || []);
-  
-  // Transform to dashboard format for components that need it
-  const transformedData = useMemo(() => transformSessionData(filteredData), [filteredData]);
-  
-  // Filter PowerCycle and Barre sessions
-  const powerCycleData = useMemo(() => {
-    return filteredData.filter(session => {
+  const filteredSessions = useFilteredSessionsData(sessionsData);
+
+  // Separate PowerCycle and Barre data
+  const { powerCycleData, barreData } = useMemo(() => {
+    if (!filteredSessions || filteredSessions.length === 0) {
+      return { powerCycleData: [], barreData: [] };
+    }
+
+    const powerCycle = filteredSessions.filter(session => {
       const className = session.cleanedClass?.toLowerCase() || '';
       return className.includes('cycle') || className.includes('power');
     });
-  }, [filteredData]);
 
-  const barreData = useMemo(() => {
-    return filteredData.filter(session => {
+    const barre = filteredSessions.filter(session => {
       const className = session.cleanedClass?.toLowerCase() || '';
       return className.includes('barre');
     });
-  }, [filteredData]);
 
-  // Transform for components that need dashboard format
-  const transformedPowerCycleData = useMemo(() => transformSessionData(powerCycleData), [powerCycleData]);
-  const transformedBarreData = useMemo(() => transformSessionData(barreData), [barreData]);
+    return { powerCycleData: powerCycle, barreData: barre };
+  }, [filteredSessions]);
 
   const handleItemClick = (item: any) => {
-    console.log('Clicked item:', item);
+    setSelectedTrainer(item);
+    setIsDrillDownOpen(true);
+  };
+
+  const handleRowClick = (item: any) => {
+    setSelectedTrainer(item);
+    setIsDrillDownOpen(true);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-pink-50/20 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-slate-600">Loading PowerCycle vs Barre Analytics...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-pink-50/20 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-red-600">Error loading data: {error}</p>
-        </div>
+      <div className="text-center text-red-600 p-4">
+        Error loading sessions data: {error}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-pink-50/20 p-6">
-      <div className="max-w-[1600px] mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-purple-900 via-blue-800 to-indigo-700 rounded-3xl text-white shadow-2xl">
+        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-900 via-purple-800 to-indigo-700 rounded-3xl text-white shadow-2xl">
           <div className="absolute inset-0 bg-black/20" />
           
           {/* Animated background elements */}
@@ -121,135 +98,106 @@ const PowerCycleVsBarreSection = () => {
           
           <div className="relative p-12">
             <div className="text-center space-y-6">
-              <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20 animate-fade-in-up">
+              <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20">
                 <Zap className="w-6 h-6" />
-                <span className="font-semibold text-lg">PowerCycle vs Barre</span>
+                <span className="font-semibold text-lg">PowerCycle vs Barre Analytics</span>
               </div>
               
-              <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent animate-fade-in-up delay-200">
-                Format Performance Analytics
+              <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-white via-indigo-100 to-purple-100 bg-clip-text text-transparent">
+                Class Format Comparison
               </h1>
               
-              <p className="text-xl text-blue-100 max-w-4xl mx-auto leading-relaxed animate-fade-in-up delay-300">
-                Comprehensive insights into PowerCycle and Barre sessions, including attendance, fill rates, and more.
+              <p className="text-xl text-indigo-100 max-w-4xl mx-auto leading-relaxed">
+                Comprehensive analysis comparing PowerCycle and Barre class performance, attendance, and trainer metrics
               </p>
               
-              <div className="flex items-center justify-center gap-4 animate-fade-in-up delay-400">
+              <div className="flex items-center justify-center gap-4">
                 <Badge className="bg-white/10 text-white border-white/20 px-4 py-2">
                   <Calendar className="w-4 h-4 mr-2" />
-                  Real-Time Data
+                  Real-time Analytics
                 </Badge>
                 <Badge className="bg-green-500/20 text-green-100 border-green-400/30 px-4 py-2">
                   <Activity className="w-4 h-4 mr-2" />
-                  Live Analytics
+                  {filteredSessions.length} Total Sessions
                 </Badge>
                 <Badge className="bg-blue-500/20 text-blue-100 border-blue-400/30 px-4 py-2">
-                  <Users className="w-4 h-4 mr-2" />
-                  {filteredData.length} Sessions
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  PowerCycle: {powerCycleData.length} | Barre: {barreData.length}
                 </Badge>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Filter Section */}
-        <PowerCycleVsBarreEnhancedFilterSection data={filteredData} />
-
-        {/* Key Metrics Overview */}
-        <PowerCycleVsBarreMetricCards 
-          powerCycleData={transformedPowerCycleData}
-          barreData={transformedBarreData}
-        />
-
-        {/* Main Content Tabs */}
+        {/* Main Content */}
         <Card className="bg-white/90 backdrop-blur-sm shadow-2xl border-0 overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-slate-900 via-blue-900 to-purple-900 text-white border-0">
             <CardTitle className="text-2xl font-bold flex items-center gap-4">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                 <TrendingUp className="w-6 h-6" />
               </div>
-              PowerCycle vs Barre Analytics
+              PowerCycle vs Barre Performance Analysis
               <Badge className="bg-white/20 text-white backdrop-blur-sm px-3 py-1">
-                {filteredData.length} Sessions Analyzed
+                Comparative Analytics
               </Badge>
             </CardTitle>
           </CardHeader>
 
           <CardContent className="p-8">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="bg-white/90 backdrop-blur-sm p-2 rounded-2xl shadow-xl border-0 grid grid-cols-5 w-full max-w-5xl mx-auto overflow-hidden mb-8">
-                <TabsTrigger 
-                  value="metrics" 
-                  className="relative rounded-xl px-4 py-3 font-semibold text-sm transition-all duration-300 ease-out hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:bg-gray-50"
-                >
+            <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+              <TabsList className="bg-white/90 backdrop-blur-sm p-2 rounded-2xl shadow-xl border-0 grid grid-cols-4 w-full max-w-2xl mx-auto overflow-hidden mb-8">
+                <TabsTrigger value="metrics" className="rounded-xl px-4 py-3 font-semibold text-sm">
                   <BarChart3 className="w-4 h-4 mr-2" />
-                  Charts
+                  Key Metrics
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="comparison" 
-                  className="relative rounded-xl px-4 py-3 font-semibold text-sm transition-all duration-300 ease-out hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:bg-gray-50"
-                >
+                <TabsTrigger value="comparison" className="rounded-xl px-4 py-3 font-semibold text-sm">
                   <Target className="w-4 h-4 mr-2" />
                   Comparison
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="tables" 
-                  className="relative rounded-xl px-4 py-3 font-semibold text-sm transition-all duration-300 ease-out hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:bg-gray-50"
-                >
-                  <Activity className="w-4 h-4 mr-2" />
+                <TabsTrigger value="tables" className="rounded-xl px-4 py-3 font-semibold text-sm">
+                  <Users className="w-4 h-4 mr-2" />
                   Data Tables
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="rankings" 
-                  className="relative rounded-xl px-4 py-3 font-semibold text-sm transition-all duration-300 ease-out hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:bg-gray-50"
-                >
+                <TabsTrigger value="rankings" className="rounded-xl px-4 py-3 font-semibold text-sm">
                   <TrendingUp className="w-4 h-4 mr-2" />
-                  Top/Bottom
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="advanced" 
-                  className="relative rounded-xl px-4 py-3 font-semibold text-sm transition-all duration-300 ease-out hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:bg-gray-50"
-                >
-                  <Filter className="w-4 h-4 mr-2" />
-                  Advanced
+                  Rankings
                 </TabsTrigger>
               </TabsList>
 
               <div className="space-y-6">
                 <TabsContent value="metrics" className="space-y-6 mt-0">
-                  <PowerCycleVsBarreCharts 
-                    powerCycleData={transformedPowerCycleData}
-                    barreData={transformedBarreData}
+                  <PowerCycleVsBarreMetricCards 
+                    data={{
+                      powerCycle: transformSessionData(powerCycleData),
+                      barre: transformSessionData(barreData)
+                    }}
                   />
                 </TabsContent>
 
                 <TabsContent value="comparison" className="space-y-6 mt-0">
                   <PowerCycleVsBarreComparison 
-                    powerCycleData={transformedPowerCycleData}
-                    barreData={transformedBarreData}
+                    data={{
+                      powerCycle: transformSessionData(powerCycleData),
+                      barre: transformSessionData(barreData)
+                    }}
                     onItemClick={handleItemClick}
                   />
                 </TabsContent>
 
                 <TabsContent value="tables" className="space-y-6 mt-0">
                   <PowerCycleVsBarreTables 
-                    powerCycleData={transformedPowerCycleData}
-                    barreData={transformedBarreData}
-                    onRowClick={handleItemClick}
+                    data={{
+                      powerCycle: transformSessionData(powerCycleData),
+                      barre: transformSessionData(barreData)
+                    }}
+                    onItemClick={handleRowClick}
                   />
                 </TabsContent>
 
                 <TabsContent value="rankings" className="space-y-6 mt-0">
                   <PowerCycleVsBarreTopBottomLists 
-                    powerCycleData={transformedPowerCycleData}
-                    barreData={transformedBarreData}
-                    onItemClick={handleItemClick}
-                  />
-                </TabsContent>
-
-                <TabsContent value="advanced" className="space-y-6 mt-0">
-                  <PowerCycleVsBarreAdvancedMetrics 
-                    data={transformedData}
+                    powerCycleData={transformSessionData(powerCycleData)}
+                    barreData={transformSessionData(barreData)}
                   />
                 </TabsContent>
               </div>
@@ -257,21 +205,12 @@ const PowerCycleVsBarreSection = () => {
           </CardContent>
         </Card>
 
-        {/* Source Data Modal */}
-        {showSourceData && (
-          <SourceDataModal
-            open={showSourceData}
-            onOpenChange={setShowSourceData}
-            sources={[
-              {
-                name: "PowerCycle Sessions",
-                data: powerCycleData
-              },
-              {
-                name: "Barre Sessions", 
-                data: barreData
-              }
-            ]}
+        {/* Drill Down Modal */}
+        {selectedTrainer && (
+          <EnhancedTrainerDrillDownModal
+            trainer={selectedTrainer}
+            open={isDrillDownOpen}
+            onOpenChange={setIsDrillDownOpen}
           />
         )}
       </div>
@@ -279,13 +218,4 @@ const PowerCycleVsBarreSection = () => {
   );
 };
 
-const PowerCycleVsBarreSectionWithProvider = () => {
-  return (
-    <SessionsFiltersProvider>
-      <PowerCycleVsBarreSection />
-    </SessionsFiltersProvider>
-  );
-};
-
-export { PowerCycleVsBarreSection };
-export default PowerCycleVsBarreSectionWithProvider;
+export default PowerCycleVsBarreSection;
