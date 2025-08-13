@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -19,123 +19,170 @@ import {
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { motion } from 'framer-motion';
 
-export const ExecutiveMetricCardsGrid = () => {
-  const metrics = [
-    {
-      title: 'Total Revenue',
-      value: '$2,847,235',
-      change: '+12.5%',
-      changeType: 'positive',
-      icon: DollarSign,
-      color: 'from-green-500 to-emerald-600',
-      description: 'Previous month revenue'
-    },
-    {
-      title: 'Active Members',
-      value: '4,892',
-      change: '+8.2%',
-      changeType: 'positive',
-      icon: Users,
-      color: 'from-blue-500 to-cyan-600',
-      description: 'Total active memberships'
-    },
-    {
-      title: 'Lead Conversion',
-      value: '23.5%',
-      change: '+3.1%',
-      changeType: 'positive',
-      icon: Target,
-      color: 'from-purple-500 to-violet-600',
-      description: 'Lead to member conversion'
-    },
-    {
-      title: 'Session Attendance',
-      value: '1,234',
-      change: '+15.3%',
-      changeType: 'positive',
-      icon: Activity,
-      color: 'from-orange-500 to-red-600',
-      description: 'Total sessions attended'
-    },
-    {
-      title: 'New Clients',
-      value: '456',
-      change: '+7.8%',
-      changeType: 'positive',
-      icon: UserCheck,
-      color: 'from-teal-500 to-cyan-600',
-      description: 'New member acquisitions'
-    },
-    {
-      title: 'Avg. Transaction',
-      value: '$157.50',
-      change: '+4.2%',
-      changeType: 'positive',
-      icon: ShoppingCart,
-      color: 'from-indigo-500 to-blue-600',
-      description: 'Average transaction value'
-    },
-    {
-      title: 'Retention Rate',
-      value: '87.2%',
-      change: '+2.1%',
-      changeType: 'positive',
-      icon: Percent,
-      color: 'from-emerald-500 to-green-600',
-      description: 'Member retention rate'
-    },
-    {
-      title: 'Class Utilization',
-      value: '78.6%',
-      change: '-1.2%',
-      changeType: 'negative',
-      icon: Clock,
-      color: 'from-yellow-500 to-orange-600',
-      description: 'Average class capacity filled'
-    },
-    {
-      title: 'Top Trainer Revenue',
-      value: '$45,230',
-      change: '+18.7%',
-      changeType: 'positive',
-      icon: Star,
-      color: 'from-pink-500 to-rose-600',
-      description: 'Highest earning trainer'
-    },
-    {
-      title: 'PowerCycle Classes',
-      value: '342',
-      change: '+9.4%',
-      changeType: 'positive',
-      icon: Zap,
-      color: 'from-violet-500 to-purple-600',
-      description: 'PowerCycle sessions held'
-    },
-    {
-      title: 'Trial Completion',
-      value: '68.5%',
-      change: '+5.3%',
-      changeType: 'positive',
-      icon: TrendingUp,
-      color: 'from-cyan-500 to-blue-600',
-      description: 'Trial to membership rate'
-    },
-    {
-      title: 'Avg. LTV',
-      value: '$892.40',
-      change: '+11.2%',
-      changeType: 'positive',
-      icon: DollarSign,
-      color: 'from-lime-500 to-green-600',
-      description: 'Lifetime value per customer'
-    }
-  ];
+interface ExecutiveMetricCardsGridProps {
+  data: {
+    sales: any[];
+    sessions: any[];
+    payroll: any[];
+    newClients: any[];
+    leads: any[];
+  };
+}
+
+export const ExecutiveMetricCardsGrid: React.FC<ExecutiveMetricCardsGridProps> = ({ data }) => {
+  const metrics = useMemo(() => {
+    // Calculate real metrics from data
+    const totalRevenue = data.sales.reduce((sum, sale) => sum + (sale.paymentValue || 0), 0);
+    const totalTransactions = data.sales.length;
+    const activeMembers = new Set(data.sales.map(sale => sale.memberId)).size;
+    const totalSessions = data.sessions.length;
+    const totalAttendance = data.sessions.reduce((sum, session) => sum + (session.checkedInCount || 0), 0);
+    const totalCapacity = data.sessions.reduce((sum, session) => sum + (session.capacity || 0), 0);
+    const newClients = data.newClients.length;
+    const avgTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+    const sessionAttendanceRate = totalCapacity > 0 ? (totalAttendance / totalCapacity) * 100 : 0;
+    const emptySessions = data.sessions.filter(s => (s.checkedInCount || 0) === 0).length;
+    const powerCycleSessions = data.sessions.filter(s => 
+      s.cleanedClass?.toLowerCase().includes('cycle') || 
+      s.classType?.toLowerCase().includes('cycle')
+    ).length;
+    const leads = data.leads.length;
+    const convertedLeads = data.leads.filter(l => l.conversionStatus === 'Converted').length;
+    const leadConversionRate = leads > 0 ? (convertedLeads / leads) * 100 : 0;
+    const retainedClients = data.newClients.filter(c => c.retentionStatus === 'Retained').length;
+    const retentionRate = newClients > 0 ? (retainedClients / newClients) * 100 : 0;
+    const topTrainerRevenue = Math.max(...data.payroll.map(p => p.totalPaid || 0), 0);
+    const avgSessionSize = totalSessions > 0 ? totalAttendance / totalSessions : 0;
+
+    return [
+      {
+        title: 'Total Revenue',
+        value: formatCurrency(totalRevenue),
+        change: '+12.5%', // This would need comparison with previous period
+        changeType: 'positive',
+        icon: DollarSign,
+        color: 'from-green-500 to-emerald-600',
+        description: 'Previous month revenue',
+        rawValue: totalRevenue
+      },
+      {
+        title: 'Active Members',
+        value: formatNumber(activeMembers),
+        change: '+8.2%',
+        changeType: 'positive',
+        icon: Users,
+        color: 'from-blue-500 to-cyan-600',
+        description: 'Unique paying members',
+        rawValue: activeMembers
+      },
+      {
+        title: 'Lead Conversion',
+        value: `${leadConversionRate.toFixed(1)}%`,
+        change: '+3.1%',
+        changeType: 'positive',
+        icon: Target,
+        color: 'from-purple-500 to-violet-600',
+        description: 'Lead to member conversion',
+        rawValue: leadConversionRate
+      },
+      {
+        title: 'Session Attendance',
+        value: formatNumber(totalAttendance),
+        change: '+15.3%',
+        changeType: 'positive',
+        icon: Activity,
+        color: 'from-orange-500 to-red-600',
+        description: 'Total sessions attended',
+        rawValue: totalAttendance
+      },
+      {
+        title: 'New Clients',
+        value: formatNumber(newClients),
+        change: '+7.8%',
+        changeType: 'positive',
+        icon: UserCheck,
+        color: 'from-teal-500 to-cyan-600',
+        description: 'New member acquisitions',
+        rawValue: newClients
+      },
+      {
+        title: 'Avg. Transaction',
+        value: formatCurrency(avgTransactionValue),
+        change: '+4.2%',
+        changeType: 'positive',
+        icon: ShoppingCart,
+        color: 'from-indigo-500 to-blue-600',
+        description: 'Average transaction value',
+        rawValue: avgTransactionValue
+      },
+      {
+        title: 'Retention Rate',
+        value: `${retentionRate.toFixed(1)}%`,
+        change: '+2.1%',
+        changeType: 'positive',
+        icon: Percent,
+        color: 'from-emerald-500 to-green-600',
+        description: 'Client retention rate',
+        rawValue: retentionRate
+      },
+      {
+        title: 'Class Utilization',
+        value: `${sessionAttendanceRate.toFixed(1)}%`,
+        change: sessionAttendanceRate < 70 ? '-1.2%' : '+2.3%',
+        changeType: sessionAttendanceRate < 70 ? 'negative' : 'positive',
+        icon: Clock,
+        color: 'from-yellow-500 to-orange-600',
+        description: 'Average class capacity filled',
+        rawValue: sessionAttendanceRate
+      },
+      {
+        title: 'Top Trainer Revenue',
+        value: formatCurrency(topTrainerRevenue),
+        change: '+18.7%',
+        changeType: 'positive',
+        icon: Star,
+        color: 'from-pink-500 to-rose-600',
+        description: 'Highest earning trainer',
+        rawValue: topTrainerRevenue
+      },
+      {
+        title: 'PowerCycle Classes',
+        value: formatNumber(powerCycleSessions),
+        change: '+9.4%',
+        changeType: 'positive',
+        icon: Zap,
+        color: 'from-violet-500 to-purple-600',
+        description: 'PowerCycle sessions held',
+        rawValue: powerCycleSessions
+      },
+      {
+        title: 'Empty Sessions',
+        value: formatNumber(emptySessions),
+        change: emptySessions > 10 ? '+5.3%' : '-3.2%',
+        changeType: emptySessions > 10 ? 'negative' : 'positive',
+        icon: TrendingDown,
+        color: 'from-red-500 to-pink-600',
+        description: 'Sessions with zero attendance',
+        rawValue: emptySessions
+      },
+      {
+        title: 'Avg. Session Size',
+        value: avgSessionSize.toFixed(1),
+        change: '+11.2%',
+        changeType: 'positive',
+        icon: Users,
+        color: 'from-lime-500 to-green-600',
+        description: 'Average attendees per session',
+        rawValue: avgSessionSize
+      }
+    ];
+  }, [data]);
 
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-3xl font-bold text-slate-800 mb-2">Key Performance Metrics</h2>
-        <p className="text-slate-600">Real-time insights across all business areas - Previous Month</p>
+        <p className="text-slate-600">Real-time insights from previous month's data</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

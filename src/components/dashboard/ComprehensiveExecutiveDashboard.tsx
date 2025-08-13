@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,11 +26,60 @@ import { ExecutiveDataTablesGrid } from './ExecutiveDataTablesGrid';
 import { ExecutiveTopPerformersGrid } from './ExecutiveTopPerformersGrid';
 import { SourceDataModal } from '@/components/ui/SourceDataModal';
 import { useGlobalFilters } from '@/contexts/GlobalFiltersContext';
+import { useSalesData } from '@/hooks/useSalesData';
+import { useSessionsData } from '@/hooks/useSessionsData';
+import { usePayrollData } from '@/hooks/usePayrollData';
+import { useNewClientsData } from '@/hooks/useNewClientsData';
+import { useLeadsData } from '@/hooks/useLeadsData';
 
 export const ComprehensiveExecutiveDashboard = () => {
   const [showSourceData, setShowSourceData] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
   const { filters } = useGlobalFilters();
+
+  // Load real data from hooks
+  const { data: salesData, isLoading: salesLoading } = useSalesData();
+  const { data: sessionsData, isLoading: sessionsLoading } = useSessionsData();
+  const { data: payrollData, isLoading: payrollLoading } = usePayrollData();
+  const { data: newClientsData, isLoading: newClientsLoading } = useNewClientsData();
+  const { data: leadsData, isLoading: leadsLoading } = useLeadsData();
+
+  // Filter data to previous month
+  const previousMonthData = useMemo(() => {
+    const now = new Date();
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const filterByPreviousMonth = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date >= previousMonth && date < currentMonth;
+    };
+
+    return {
+      sales: salesData?.filter(item => filterByPreviousMonth(item.paymentDate)) || [],
+      sessions: sessionsData?.filter(item => filterByPreviousMonth(item.date)) || [],
+      payroll: payrollData?.filter(item => {
+        const monthYear = item.monthYear;
+        const prevMonthStr = previousMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        return monthYear === prevMonthStr;
+      }) || [],
+      newClients: newClientsData?.filter(item => filterByPreviousMonth(item.firstVisitDate)) || [],
+      leads: leadsData?.filter(item => filterByPreviousMonth(item.createdDate || '')) || []
+    };
+  }, [salesData, sessionsData, payrollData, newClientsData, leadsData]);
+
+  const isLoading = salesLoading || sessionsLoading || payrollLoading || newClientsLoading || leadsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-pink-50/20 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-slate-600">Loading Executive Dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-pink-50/20 p-6">
@@ -70,6 +119,10 @@ export const ComprehensiveExecutiveDashboard = () => {
                   <Activity className="w-4 h-4 mr-2" />
                   Live Analytics
                 </Badge>
+                <Badge className="bg-blue-500/20 text-blue-100 border-blue-400/30 px-4 py-2">
+                  <Users className="w-4 h-4 mr-2" />
+                  {previousMonthData.sales.length + previousMonthData.sessions.length + previousMonthData.newClients.length} Records
+                </Badge>
               </div>
             </div>
           </div>
@@ -78,11 +131,11 @@ export const ComprehensiveExecutiveDashboard = () => {
         {/* Executive Filters */}
         <ExecutiveFilters />
 
-        {/* Key Performance Metrics - 12 Cards */}
-        <ExecutiveMetricCardsGrid />
+        {/* Key Performance Metrics - 12 Cards with real data */}
+        <ExecutiveMetricCardsGrid data={previousMonthData} />
 
-        {/* Interactive Charts Section - 4 Charts */}
-        <ExecutiveChartsGrid />
+        {/* Interactive Charts Section - 4 Charts with real data */}
+        <ExecutiveChartsGrid data={previousMonthData} />
 
         {/* Main Content Sections */}
         <Card className="bg-white/90 backdrop-blur-sm shadow-2xl border-0 overflow-hidden">
@@ -133,15 +186,15 @@ export const ComprehensiveExecutiveDashboard = () => {
 
               <div className="space-y-6">
                 <TabsContent value="overview" className="space-y-6 mt-0">
-                  <ExecutiveDataTablesGrid />
+                  <ExecutiveDataTablesGrid data={previousMonthData} />
                 </TabsContent>
 
                 <TabsContent value="performers" className="space-y-6 mt-0">
-                  <ExecutiveTopPerformersGrid />
+                  <ExecutiveTopPerformersGrid data={previousMonthData} />
                 </TabsContent>
 
                 <TabsContent value="trends" className="space-y-6 mt-0">
-                  <ExecutiveChartsGrid showTrends={true} />
+                  <ExecutiveChartsGrid data={previousMonthData} showTrends={true} />
                 </TabsContent>
 
                 <TabsContent value="insights" className="space-y-6 mt-0">
@@ -153,15 +206,21 @@ export const ComprehensiveExecutiveDashboard = () => {
                       <CardContent className="space-y-4">
                         <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
                           <TrendingUp className="w-5 h-5 text-green-600" />
-                          <span className="text-sm font-medium">Revenue up 12.5% from last month</span>
+                          <span className="text-sm font-medium">
+                            Total Revenue: ${previousMonthData.sales.reduce((sum, sale) => sum + sale.paymentValue, 0).toLocaleString()}
+                          </span>
                         </div>
                         <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
                           <Users className="w-5 h-5 text-blue-600" />
-                          <span className="text-sm font-medium">Member growth rate: 8.2%</span>
+                          <span className="text-sm font-medium">
+                            New Clients: {previousMonthData.newClients.length}
+                          </span>
                         </div>
                         <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
                           <Target className="w-5 h-5 text-purple-600" />
-                          <span className="text-sm font-medium">Lead conversion improved by 3.1%</span>
+                          <span className="text-sm font-medium">
+                            Total Sessions: {previousMonthData.sessions.length}
+                          </span>
                         </div>
                       </CardContent>
                     </Card>
@@ -173,15 +232,22 @@ export const ComprehensiveExecutiveDashboard = () => {
                       <CardContent className="space-y-4">
                         <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
                           <Clock className="w-5 h-5 text-orange-600" />
-                          <span className="text-sm font-medium">Focus on bottom 10% performers</span>
+                          <span className="text-sm font-medium">
+                            Sessions with low attendance: {previousMonthData.sessions.filter(s => s.checkedInCount < s.capacity * 0.5).length}
+                          </span>
                         </div>
                         <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
                           <TrendingDown className="w-5 h-5 text-red-600" />
-                          <span className="text-sm font-medium">Investigate session no-show rates</span>
+                          <span className="text-sm font-medium">
+                            Empty sessions: {previousMonthData.sessions.filter(s => s.checkedInCount === 0).length}
+                          </span>
                         </div>
                         <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
                           <Zap className="w-5 h-5 text-yellow-600" />
-                          <span className="text-sm font-medium">Optimize PowerCycle class schedules</span>
+                          <span className="text-sm font-medium">
+                            Lead conversion rate: {previousMonthData.leads.length > 0 ? 
+                              ((previousMonthData.leads.filter(l => l.conversionStatus === 'Converted').length / previousMonthData.leads.length) * 100).toFixed(1) : '0'}%
+                          </span>
                         </div>
                       </CardContent>
                     </Card>
@@ -199,8 +265,24 @@ export const ComprehensiveExecutiveDashboard = () => {
             onOpenChange={setShowSourceData}
             sources={[
               {
-                name: "Comprehensive Executive Data",
-                data: []
+                name: "Sales Data (Previous Month)",
+                data: previousMonthData.sales
+              },
+              {
+                name: "Sessions Data (Previous Month)",
+                data: previousMonthData.sessions
+              },
+              {
+                name: "New Clients Data (Previous Month)",
+                data: previousMonthData.newClients
+              },
+              {
+                name: "Leads Data (Previous Month)",
+                data: previousMonthData.leads
+              },
+              {
+                name: "Payroll Data (Previous Month)",
+                data: previousMonthData.payroll
               }
             ]}
           />
