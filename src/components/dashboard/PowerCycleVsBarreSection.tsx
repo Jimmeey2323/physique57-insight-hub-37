@@ -276,8 +276,7 @@ export const PowerCycleVsBarreSection: React.FC<PowerCycleVsBarreSectionProps> =
 
               <TabsContent value="advanced" className="space-y-6 mt-0">
                 <PowerCycleVsBarreAdvancedMetrics 
-                  data={transformedData}
-                  onItemClick={handleItemClick}
+                  data={filteredData}
                 />
               </TabsContent>
 
