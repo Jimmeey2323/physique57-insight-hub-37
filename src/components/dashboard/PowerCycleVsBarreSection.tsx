@@ -10,7 +10,7 @@ import { PowerCycleVsBarreComparison } from './PowerCycleVsBarreComparison';
 import { PowerCycleVsBarreTables } from './PowerCycleVsBarreTables';
 import { PowerCycleVsBarreTopBottomLists } from './PowerCycleVsBarreTopBottomLists';
 import { EnhancedTrainerDrillDownModal } from './EnhancedTrainerDrillDownModal';
-import { useSessionsData } from '@/hooks/useSessionsData';
+import { useSessionsData, SessionData } from '@/hooks/useSessionsData';
 import { useFilteredSessionsData } from '@/hooks/useFilteredSessionsData';
 import { SessionsFiltersProvider } from '@/contexts/SessionsFiltersContext';
 
@@ -19,7 +19,7 @@ const PowerCycleVsBarreSection = () => {
   const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
   const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
   
-  const { data: sessionsData, isLoading: loading, error } = useSessionsData();
+  const { data: sessionsData, loading, error } = useSessionsData();
   const filteredSessions = useFilteredSessionsData(sessionsData);
 
   // Separate PowerCycle and Barre data
@@ -43,19 +43,19 @@ const PowerCycleVsBarreSection = () => {
 
   // Calculate metrics for comparison component
   const comparisonMetrics = useMemo(() => {
-    const calculateMetrics = (data: any[]) => ({
+    const calculateMetrics = (data: SessionData[]) => ({
       totalSessions: data.length,
       totalAttendance: data.reduce((sum, s) => sum + s.checkedInCount, 0),
       totalCapacity: data.reduce((sum, s) => sum + s.capacity, 0),
-      totalBookings: data.reduce((sum, s) => sum + s.bookedCount, 0),
+      totalBookings: data.reduce((sum, s) => sum + (s.bookedCount || 0), 0),
       emptySessions: data.filter(s => s.checkedInCount === 0).length,
-      avgFillRate: data.length > 0 ? (data.reduce((sum, s) => sum + s.fillPercentage, 0) / data.length) : 0,
+      avgFillRate: data.length > 0 ? (data.reduce((sum, s) => sum + (s.fillPercentage || 0), 0) / data.length) : 0,
       avgSessionSize: data.length > 0 ? (data.reduce((sum, s) => sum + s.checkedInCount, 0) / data.length) : 0,
       avgSessionSizeExclEmpty: (() => {
         const nonEmpty = data.filter(s => s.checkedInCount > 0);
         return nonEmpty.length > 0 ? (nonEmpty.reduce((sum, s) => sum + s.checkedInCount, 0) / nonEmpty.length) : 0;
       })(),
-      noShows: data.reduce((sum, s) => sum + (s.bookedCount - s.checkedInCount), 0)
+      noShows: data.reduce((sum, s) => sum + Math.max(0, (s.bookedCount || 0) - s.checkedInCount), 0)
     });
 
     return {
@@ -211,8 +211,8 @@ const PowerCycleVsBarreSection = () => {
         {selectedTrainer && (
           <EnhancedTrainerDrillDownModal
             trainerData={selectedTrainer}
-            open={isDrillDownOpen}
-            onOpenChange={setIsDrillDownOpen}
+            isOpen={isDrillDownOpen}
+            onClose={() => setIsDrillDownOpen(false)}
           />
         )}
       </div>
